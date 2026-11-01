@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export const PHASES = ['Get ready', 'Build', 'Reflect', 'Make it yours', 'Your card', 'Reflect again'];
 export const SCALE = [['Magic button', 'I hand it over'], ['Centaur', 'We split the work'], ['Cyborg', 'We think as one']];
+export const AI_TOOLS = ['ChatGPT', 'Gemini', 'Claude', 'Copilot', 'Something else'] as const;
 export const TWISTS = ['for people who have never met', "for people who don’t share a language", 'that only works at night', 'for people who disagree', 'that works without electricity', 'for a city 100 years from now', 'that fits in a pocket', 'for strangers on a train', 'for one minute a day', 'for people of all ages at once', 'that moves', 'that makes a sound', 'in the middle of a forest', 'for a rainy Monday morning', 'for people waiting in line', 'that grows over time', 'for neighbours who never talk', 'for a place where everyone is in a hurry'];
 export const CARD_PHASE = [-1, 0, 1, 1, 1, 2, 3, 4, 5, 5];
 export const FLOW_STEPS = ['Welcome', 'Before question', 'Brick photo', 'AI instructions', 'Build', 'Reflection', 'Develop the idea', 'Concept card', 'After question', 'Finished'];
@@ -21,10 +22,12 @@ export type ParticipantActivity = {
   waitingForPhase:number|null; pendingSaves:number; pendingSince:string|null; syncStatus:ActivityReport['syncStatus']|null;
   photos:ActivityReport['photos']|null; handedOff:boolean|null; cardReady:boolean|null;
   answeredBefore:boolean; answeredAfter:boolean; sharing:boolean; cardSubmitted:boolean;
+  aiTool:Answers['aiTool']|null;
   finished:boolean; needsAttention:boolean; recent:boolean;
 };
 export type HostTelemetry = {connected:number; recent:number; waiting:number; finished:number; needsAttention:number; steps:number[]; participants:ParticipantActivity[]};
 export const answerPatch = z.object({
+  aiTool: z.enum(AI_TOOLS).optional(),
   before: z.number().int().min(0).max(2).optional(), after: z.number().int().min(0).max(2).optional(),
   works: z.enum(['Yes', 'Partly', 'No']).optional(), feel: z.enum(['Easy', 'Mixed', 'Uncomfortable']).optional(),
   share: z.boolean().optional(), progress: z.number().int().min(0).max(9).optional(),
