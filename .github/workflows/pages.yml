@@ -22,8 +22,9 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          BASE_PATH: /builders-with-taste/
+          BASE_PATH: ./
           VITE_API_URL: https://build-api.btrbot.com
+          VITE_PUBLIC_URL: https://brick.btrbot.com/
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:

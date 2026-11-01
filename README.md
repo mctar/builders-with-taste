@@ -41,7 +41,7 @@ Connect using `ssh hugin`. Keep this app in `~/experiments/builders-with-taste` 
 2. Create `PHOTO_DIRECTORY` and give UID 1000 access to it.
 3. Run `docker compose up -d --build` and check `curl -fsS http://127.0.0.1:4181/health`.
 4. Add `build-api.btrbot.com → http://127.0.0.1:4181` to the existing named Cloudflare Tunnel, preserving all other routes. Validate the configuration, create the DNS route, and restart the tunnel service only when ready. No database port is exposed.
-5. Confirm the public `/health` endpoint, CORS from `https://mctar.github.io`, and SSE through the real tunnel. Allow SSE streaming and disable caching for API responses. Do not put an interactive login/challenge in front of the participant API.
+5. Confirm the public `/health` endpoint, CORS from `https://brick.btrbot.com` and `https://mctar.github.io`, and SSE through the real tunnel. Allow SSE streaming and disable caching for API responses. Do not put an interactive login/challenge in front of the participant API.
 
 The API container is limited to two CPU cores and 1 GB memory. Image work is bounded; a busy upload gets a retryable 503 while text responses remain available. Both containers restart automatically, and images survive container replacement. Tokens are hashed, session-scoped, role-limited, and expire (participants after two days; host/stage after 30 days). The admission code does not grant screen or host access.
 
@@ -49,7 +49,11 @@ To create a session on Hugin without printing administrator credentials, use the
 
 ## GitHub Pages
 
-The repository's `main` branch deploys through `.github/workflows/pages.yml` after tests and the production build pass. Pages must be configured to use GitHub Actions. `BASE_PATH` is `/builders-with-taste/` and `VITE_API_URL` is `https://build-api.btrbot.com`. Change those two public settings if the repository name or API hostname changes. Hash routing supports direct links and refreshes on Pages.
+The app lives at `https://brick.btrbot.com/`. The repository's `main` branch deploys through `.github/workflows/pages.yml` after tests and the production build pass. Pages uses GitHub Actions with `brick.btrbot.com` configured as its custom domain and HTTPS enforced. DNS is a DNS-only CNAME from `brick.btrbot.com` to `mctar.github.io`. Actions-based Pages deployments do not require a CNAME file.
+
+`BASE_PATH` is `./` so assets work at both the project path and domain root. `VITE_API_URL` is `https://build-api.btrbot.com`; `VITE_PUBLIC_URL` is `https://brick.btrbot.com/` for canonical join links and QR codes. Hash routing supports direct links and refreshes. Set `FRONTEND_URL=https://brick.btrbot.com/` when provisioning sessions with `scripts/session.ts`.
+
+Keep existing phone tabs open during a domain change: drafts, photos, and anonymous access are stored per browser origin. New participants use the custom domain; switching an existing phone to a different origin starts separate local storage. Both origins remain allowed by the API.
 
 Backend releases are controlled separately. Copy reviewed source to Hugin, set a distinct `APP_VERSION`, build the image, and recreate only this Compose app. Schema initialization is additive and version 1; future non-additive schema changes require an explicit migration and backup first. Keep the prior image available for rollback. The runtime database account owns this app's schema and is isolated from other databases; production migrations should be split into a separate role when the schema evolves.
 
