@@ -73,6 +73,14 @@ The facilitator selects overview, results, gallery, or reflections. Votes land a
 
 The join QR stays on screen. Click it or press **J** for a large reveal; **Escape** closes it. **M** toggles decorative motion, and the screen respects the operating system's reduced-motion setting. Use the full-screen button for projection. Rehearsal sessions are visibly marked **DRY RUN**.
 
+## Resetting a rehearsal
+
+The facilitator's **Reset all…** control opens an **Are you sure?** dialog. Cancel has the initial focus; the final button stays disabled until the facilitator types the room code. The server also checks that code, host permission, and the session revision. A retry of the same reset request cannot reset the room twice.
+
+Reset starts an empty run in the welcome lobby: zero registrations, answers, AI choices, gallery items, and telemetry, with no running/paused timer. The room code and host/stage links stay valid. Updated phones return to Join, discard the previous draft and upload queue, and obtain a fresh identity when they rejoin. Reload older open clients before the next test to load this behavior; their old credentials are rejected after reset. Offline phones clear their previous draft when they reconnect.
+
+Previous server runs remain private on Hugin for recovery and follow the same manual retention policy as other session data. They are excluded from current snapshots, exports, image access, and participant writes. Reset acknowledgements in the operations table retain the previous session settings. Private notes/photos that never left a phone cannot be recovered after its draft is cleared. After using reset, retain a backend with run isolation; older images cannot safely distinguish archived runs. Take a database/photo backup before deployment and restore that matching backup if rolling back to an older backend.
+
 ## Checks
 
-`npm test` covers phase gating, session ownership, participant/stage permissions, idempotent joins/writes, stale revisions, actual image upload/access, publication/hiding, consent revocation and stale replay, paired aggregates, pause/resume timers, CORS, and withdrawal after session closure. The load test is separate so normal CI does not generate 400 sessions or contact production.
+`npm test` covers phase gating, session ownership, participant/stage permissions, idempotent joins/writes, stale revisions, actual image upload/access, publication/hiding, consent revocation and stale replay, paired aggregates, pause/resume timers, CORS, and withdrawal after session closure. Reset checks cover confirmation, permissions, zeroed results, recovery isolation, unchanged staff links, idempotent retries, fresh joins, concurrent old writes, offline outbox cleanup, and late responses. The load test is separate so normal CI does not generate 400 sessions or contact production.

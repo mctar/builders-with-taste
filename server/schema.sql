@@ -41,3 +41,7 @@ ALTER TABLE participants ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
 ALTER TABLE participants ADD COLUMN IF NOT EXISTS telemetry_at timestamptz;
 ALTER TABLE participants ADD COLUMN IF NOT EXISTS pending_since_at timestamptz;
 ALTER TABLE participants ADD COLUMN IF NOT EXISTS client_status jsonb NOT NULL DEFAULT '{}';
+-- Runs isolate a reset from previous credentials, writes, and recovery data.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS run integer NOT NULL DEFAULT 0;
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS run integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS participant_session_run ON participants(session_id,run);

@@ -34,6 +34,7 @@ export const answerPatch = z.object({
   twist: z.enum(TWISTS as [string, ...string[]]).optional()
 }).strict();
 export const mutation = z.object({ operationId: z.uuid(), expectedRevision: z.number().int().nonnegative(), patch: answerPatch }).strict();
+export const resetInput = z.object({operationId:z.uuid(),expectedRevision:z.number().int().nonnegative(),confirmation:z.string().trim().min(6).max(12)}).strict();
 export const cardInput = z.object({
   operationId: z.uuid(), expectedRevision: z.number().int().nonnegative(), consentVersion: z.number().int().nonnegative(),
   kind: z.enum(['build', 'concept']), title: z.string().trim().max(100).default(''),
@@ -41,7 +42,7 @@ export const cardInput = z.object({
   assetId: z.uuid().nullable().default(null)
 }).strict();
 export type Answers = z.infer<typeof answerPatch>;
-export type Session = { id: string; code: string; title: string; phase: number; revision: number; closed: boolean; galleryPaused: boolean; stageView: string; endsAt: string | null; remainingMs: number | null; serverTime: string };
+export type Session = { id: string; code: string; title: string; run:number; phase: number; revision: number; closed: boolean; galleryPaused: boolean; stageView: string; endsAt: string | null; remainingMs: number | null; serverTime: string };
 export type Participant = { id: string; revision: number; consentVersion: number; data: Answers };
 export type Card = { id: string; kind: string; title: string; description: string; mine: string; assetId: string | null; hidden: boolean; updatedAt: string; twist: string };
 export type Snapshot = { session: Session; total: number; before: number[]; after: number[]; paired: number; transitions: number[][]; works: Record<string, number>; feel: Record<string, number>; progress: number[]; gallery: Card[]; capturedAt: string; telemetry?:HostTelemetry };
