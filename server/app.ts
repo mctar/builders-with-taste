@@ -9,7 +9,8 @@ import sharp from 'sharp';
 import { z, ZodError } from 'zod';
 import type { ServerResponse, OutgoingHttpHeaders } from 'node:http';
 import { database, type Database, type Query, type Row } from './db.js';
-import { mutation, cardInput, CARD_PHASE, TWISTS, type Session, type Participant, type Snapshot, type Card } from './model.js';
+import { mutation, cardInput, activityInput, CARD_PHASE, TWISTS, type Session, type Participant, type Snapshot, type Card } from './model.js';
+import { hostTelemetry } from './activity.js';
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const fail = (statusCode: number, message: string) => { throw Object.assign(new Error(message), { statusCode }); };
@@ -32,9 +33,11 @@ export async function createApp(opts: Options) {
     if(status >= 500) app.log.error(error);
     reply.code(status).send({ error: error instanceof ZodError ? 'Please check the submitted values.' : status >= 500 ? 'The server could not save this. Please try again.' : e.message });
   });
-  const streams = new Set<{session:string; role:string; res:ServerResponse}>();
+  const streams = new Set<{session:string; role:string; participant:string|null; res:ServerResponse}>();
   function notify(session: string, type = 'changed') {
-    for (const s of streams) if(s.session === session && (type === 'session' || s.role !== 'participant')) {
+    for (const s of streams) {
+      if(s.session!==session || type==='telemetry'&&s.role!=='host' || type==='changed'&&s.role==='participant')continue;
+      if(s.res.destroyed||s.res.writableEnded){streams.delete(s);continue;}
       if(s.res.writableLength > 65536) { s.res.destroy(); continue; }
       s.res.write(`event: ${type}\ndata: {}\n\n`);
     }
@@ -46,6 +49,7 @@ export async function createApp(opts: Options) {
     const token=req.headers.authorization?.replace(/^Bearer /,'') || '';
     const [c]=await db.query('SELECT * FROM credentials WHERE hash=$1 AND session_id=$2 AND expires_at>now()',[hash(token),session]);
     if(!c || !roles.includes(c.role)) fail(401,'This access link has expired or does not have permission.');
+    if(c.role==='participant' && !req.url.split('?')[0].endsWith('/telemetry')) await db.query("UPDATE participants SET last_seen_at=now() WHERE id=$1 AND (last_seen_at IS NULL OR last_seen_at<now()-interval '20 seconds')",[c.participant_id]);
     limit(hash(token),c.role==='participant'?300:1500); return c as Credential;
   }
   async function session(q:Query,id:string) { const [s]=await q('SELECT * FROM sessions WHERE id=$1',[id]); if(!s) fail(404,'Session not found.'); return s; }
@@ -82,6 +86,15 @@ export async function createApp(opts: Options) {
     }); notify(s.id); return {session:sessionView(s),participant:personView(p),token};
   });
   app.get('/v1/sessions/:id',async req=>{const id=idParam(req),c=await auth(req,id);const s=await session(db.query,id); const [p]=c.participant_id?await db.query('SELECT * FROM participants WHERE id=$1',[c.participant_id]):[]; return {session:sessionView(s),participant:p?personView(p):null};});
+  app.post('/v1/sessions/:id/telemetry',async req=>{
+    const id=idParam(req),c=await auth(req,id,['participant']),body=activityInput.parse(req.body);
+    await db.query(`UPDATE participants SET current_step=$1,
+      step_started_at=CASE WHEN current_step IS DISTINCT FROM $1 THEN now() ELSE coalesce(step_started_at,now()) END,
+      last_seen_at=now(),telemetry_at=now(),
+      pending_since_at=CASE WHEN $2::integer>0 THEN coalesce(pending_since_at,now()) ELSE NULL END,
+      client_status=$3 WHERE id=$4 AND session_id=$5`,[body.step,body.pendingSaves,JSON.stringify(body),c.participant_id,id]);
+    notify(id,'telemetry');return {ok:true};
+  });
   app.patch('/v1/sessions/:id/me',async req=>{
     const id=idParam(req), c=await auth(req,id,['participant']),b=mutation.parse(req.body);
     const result=await db.transaction(async q=>{
@@ -149,12 +162,13 @@ export async function createApp(opts: Options) {
   });
   async function snapshot(id:string,host:boolean):Promise<Snapshot> {
     return db.transaction(async q=>{
-      const s=await session(q,id),people=await q('SELECT data FROM participants WHERE session_id=$1',[id]);
+      const s=await session(q,id),people=await q('SELECT * FROM participants WHERE session_id=$1 ORDER BY created_at,id',[id]);
       const before=[0,0,0],after=[0,0,0],transitions=[[0,0,0],[0,0,0],[0,0,0]],progress=Array(10).fill(0),works:Record<string,number>={},feel:Record<string,number>={};let paired=0;
       for(const {data:d} of people) {if(d.before!=null) before[d.before]++;if(d.after!=null) after[d.after]++;if(d.before!=null && d.after!=null) {paired++;transitions[d.before][d.after]++;}progress[d.progress||0]++;if(d.works) works[d.works]=(works[d.works]||0)+1;if(d.feel) feel[d.feel]=(feel[d.feel]||0)+1;}
       const rows=(!s.gallery_paused || host)?await q(`SELECT s.*,p.data->>'twist' AS twist FROM submissions s JOIN participants p ON p.id=s.participant_id WHERE s.session_id=$1 AND p.data->>'share'='true' AND s.consent_version=p.consent_version ${host?'':'AND s.hidden=false'} ORDER BY s.updated_at DESC`,[id]):[];
       const gallery:Card[]=rows.map(r=>({id:r.id,kind:r.kind,title:r.title,description:r.description,mine:r.mine,assetId:r.asset_id,hidden:r.hidden,updatedAt:new Date(r.updated_at).toISOString(),twist:r.twist}));
-      return {session:sessionView(s),total:people.length,before,after,paired,transitions,works,feel,progress,gallery,capturedAt:new Date().toISOString()};
+      const telemetry=host?hostTelemetry(people,s.phase,new Set([...streams].filter(c=>c.session===id&&c.role==='participant').map(c=>c.participant!)),new Set(rows.filter(c=>c.kind==='concept').map(c=>c.participant_id))):undefined;
+      return {session:sessionView(s),total:people.length,before,after,paired,transitions,works,feel,progress,gallery,capturedAt:new Date().toISOString(),...(telemetry?{telemetry}:{})};
     });
   }
   app.get('/v1/sessions/:id/snapshot',async req=>{const id=idParam(req),c=await auth(req,id,['host','stage']);return snapshot(id,c.role==='host');});
@@ -178,9 +192,9 @@ export async function createApp(opts: Options) {
     const id=idParam(req),c=await auth(req,id);if(streams.size>=1200) fail(503,'Live updates are busy. Retrying shortly.');
     reply.hijack();const res=reply.raw;
     res.writeHead(200,{...reply.getHeaders(),'Content-Type':'text/event-stream','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'} as OutgoingHttpHeaders);
-    res.write('event: session\ndata: {}\n\n');const client={session:id,role:c.role,res};streams.add(client);
+    res.write('event: session\ndata: {}\n\n');const client={session:id,role:c.role,participant:c.participant_id,res};streams.add(client);if(c.role==='participant')notify(id,'telemetry');
     const beat=setInterval(()=>{if(Date.now()>new Date(c.expires_at).getTime()) res.end();else res.write(': heartbeat\n\n');},15000);
-    res.on('close',()=>{clearInterval(beat);streams.delete(client);});
+    res.on('close',()=>{clearInterval(beat);streams.delete(client);if(c.role==='participant')notify(id,'telemetry');});
   });
   app.addHook('preClose',async()=>{for(const s of streams)s.res.end();});
   app.addHook('onClose',async()=>{clearInterval(clean);await db.close();});

@@ -4,6 +4,10 @@ A mobile workshop app with facilitator-controlled phases and a live projection s
 
 Participants join with a session code, complete the original nine-card exercise, and keep using their own Claude or ChatGPT app. Structured answers contribute to room results. Build photos and submitted concept cards appear immediately only with permission. Private notes and the brick-pile photo remain on the phone. The host can pause the gallery, hide cards, control phases/timers, and export results.
 
+The facilitator dashboard shows counts at all ten participant screens, connected/waiting/finished totals, and a searchable anonymous participant roster with current screen, time there, last activity, queued saves, and checkpoints. Phones report minimal activity metadata about every 25–30 seconds and after screen/save changes. They show a matching Builder reference for troubleshooting. Host-only reports contain photo-readiness flags, never private photo contents or private reflection text. Background activity is labelled separately; long build/development steps alone are not treated as errors. Older open clients show their last saved screen until refreshed. The public projection API does not expose the roster.
+
+Every photo control has separate **Take a photo** and **Choose from camera roll** options, including when replacing a picture. The camera control requests the rear camera; the library control leaves the operating system's image picker available. Both paths use the same compression, private draft storage, and display consent rules.
+
 ## Local development
 
 Use Node 24 and npm.

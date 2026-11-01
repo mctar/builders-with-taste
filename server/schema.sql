@@ -34,3 +34,10 @@ CREATE TABLE IF NOT EXISTS submissions (
  updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(participant_id,kind)
 );
 CREATE INDEX IF NOT EXISTS submission_session ON submissions(session_id);
+-- Additive activity reporting; survey revisions and existing workshop data are preserved.
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS current_step integer;
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS step_started_at timestamptz;
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS telemetry_at timestamptz;
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS pending_since_at timestamptz;
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS client_status jsonb NOT NULL DEFAULT '{}';

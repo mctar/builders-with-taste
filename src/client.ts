@@ -18,15 +18,15 @@ export async function live(id:string,token:string,signal:AbortSignal,onChange:()
     await new Promise<void>(resolve=>{const t=setTimeout(resolve,2500+Math.random()*2000);signal.addEventListener('abort',()=>{clearTimeout(t);resolve();},{once:true});});
   }
 }
-export type Draft={step:number; decided:string; name:string; what:string; mine:string; pilePhoto:string; buildPhoto:string; conceptPhoto:string; handedOff:boolean; sent:boolean; answers:Answers};
-const blank=():Draft=>({step:0,decided:'',name:'',what:'',mine:'',pilePhoto:'',buildPhoto:'',conceptPhoto:'',handedOff:false,sent:false,answers:{}});
+export type Draft={step:number; decided:string; name:string; what:string; mine:string; pilePhoto:string; buildPhoto:string; conceptPhoto:string; handedOff:boolean; sent:boolean; answers:Answers;waitingForPhase:number|null};
+const blank=():Draft=>({step:0,decided:'',name:'',what:'',mine:'',pilePhoto:'',buildPhoto:'',conceptPhoto:'',handedOff:false,sent:false,answers:{},waitingForPhase:null});
 type Job={id:string; kind:'patch'|'publish'; patch?:Answers; card?:{kind:'build'|'concept'; title:string; description:string; mine:string; photo:string}; body?:any; assetId?:string; consentVersion?:number};
 export type Identity={id:string;token:string;participant:Participant;session:Session};
 export class Workshop {
   draft=blank(); jobs:Job[]=[]; message=''; busy=false; blocked=false; onChange=()=>{}; private persisting=Promise.resolve();
   constructor(public identity:Identity){}
   get key(){return `bwt:${this.identity.id}:${this.identity.participant.id}`;}
-  async init(){const saved=await get<{draft:Draft;jobs:Job[]}>(this.key);if(saved){this.draft=saved.draft;this.jobs=saved.jobs;}else{this.draft.answers=this.identity.participant.data;this.draft.step=this.identity.participant.data.progress||0;}this.onChange();}
+  async init(){const saved=await get<{draft:Draft;jobs:Job[]}>(this.key);if(saved){this.draft={...blank(),...saved.draft};this.jobs=saved.jobs;}else{this.draft.answers=this.identity.participant.data;this.draft.step=this.identity.participant.data.progress||0;}this.onChange();}
   async persist(){const snapshot=structuredClone({draft:this.draft,jobs:this.jobs});const save=()=>set(this.key,snapshot);this.persisting=this.persisting.then(save,save).catch(()=>{this.message='Phone storage is full. Keep this page open and free some space.';this.onChange();throw new Error(this.message);});await this.persisting;}
   edit(patch:Partial<Draft>){Object.assign(this.draft,patch);this.onChange();void this.persist().catch(()=>{});}
   async patch(patch:Answers){
@@ -69,7 +69,12 @@ export class Workshop {
   async refresh(){const state=await request<{session:Session;participant:Participant}>(`/v1/sessions/${this.identity.id}`,this.identity.token);this.identity.session=state.session;if(!this.jobs.length && !this.busy){this.identity.participant=state.participant;this.draft.answers={...state.participant.data,...this.draft.answers};}this.onChange();}
 }
 export async function photograph(file:File):Promise<string>{
-  const bitmap=await createImageBitmap(file).catch(()=>{throw new Error('This photo could not be opened. Try taking a new photo.');});
-  const factor=Math.min(1,1200/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*factor);canvas.height=Math.round(bitmap.height*factor);canvas.getContext('2d')!.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+  if(file.size>30*1024*1024)throw new Error('Choose a photo smaller than 30 MB.');
+  let bitmap:ImageBitmap|HTMLImageElement;
+  try{bitmap=await createImageBitmap(file);}catch{
+    const url=URL.createObjectURL(file);
+    try{const image=new Image();image.src=url;await image.decode();bitmap=image;}catch{throw new Error('This photo could not be opened. Choose a JPEG, PNG, or WebP photo, or take a new one.');}finally{URL.revokeObjectURL(url);}
+  }
+  const factor=Math.min(1,1200/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*factor);canvas.height=Math.round(bitmap.height*factor);canvas.getContext('2d')!.drawImage(bitmap,0,0,canvas.width,canvas.height);if('close' in bitmap)bitmap.close();
   const image=canvas.toDataURL('image/jpeg',.78);if(image.length>2400000)throw new Error('This photo is too large. Try a simpler photo.');return image;
 }

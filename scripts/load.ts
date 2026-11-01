@@ -11,8 +11,13 @@ const abort=new AbortController();let liveConnections=0;
 const streams=clients.map(async c=>{const r=await fetch(api+root+'/events',{headers:{Authorization:'Bearer '+c.token},signal:abort.signal});if(!r.ok)throw new Error('SSE '+r.status);liveConnections++;const reader=r.body!.getReader();try{while(!(await reader.read()).done){}}catch{}});
 await call(root+'/control',session.hostToken,{expectedRevision:0,phase:0},'PATCH');
 await Promise.all(clients.map((c,i)=>call(root+'/me',c.token,{operationId:randomUUID(),expectedRevision:0,patch:{before:i%3,share:true}},'PATCH')));
+const activity={step:1,visibility:'visible',pendingSaves:0,syncStatus:'saved',waitingForPhase:1,photos:{pile:false,build:false,concept:false},handedOff:false,cardReady:false};
+await Promise.all(clients.map(c=>call(root+'/telemetry',c.token,activity)));
+const waitingSnapshot=await call(root+'/snapshot',session.hostToken);
 await call(root+'/control',session.hostToken,{expectedRevision:1,phase:5},'PATCH');
-await Promise.all(clients.map((c,i)=>call(root+'/me',c.token,{operationId:randomUUID(),expectedRevision:1,patch:{after:(i+1)%3}},'PATCH')));
+await Promise.all(clients.map((c,i)=>call(root+'/me',c.token,{operationId:randomUUID(),expectedRevision:1,patch:{after:(i+1)%3,progress:9}},'PATCH')));
+await Promise.all(clients.map(c=>call(root+'/telemetry',c.token,{...activity,step:9,waitingForPhase:null})));
+const finishedSnapshot=await call(root+'/snapshot',session.hostToken);
 const snapshot=await call(root+'/snapshot',session.stageToken);
 let photoSuccess=0,photoRetries=0;
 const photoCount=Math.min(count,Number(process.env.PHOTOS||0));
@@ -30,5 +35,5 @@ if(photoCount){
 }
 abort.abort();await Promise.allSettled(streams);
 await call(root+'/control',session.hostToken,{expectedRevision:2,closed:true},'PATCH');
-latencies.sort((a,b)=>a-b);const report={at:new Date().toISOString(),api,users:count,liveConnections,requests:latencies.length,errors,total:snapshot.total,paired:snapshot.paired,photoCount,photoSuccess,photoRetries,p50Ms:Math.round(latencies[Math.floor(latencies.length*.5)]),p95Ms:Math.round(latencies[Math.floor(latencies.length*.95)]),maxMs:Math.round(latencies.at(-1)!)};
-const reportDirectory=process.env.REPORT_DIRECTORY||'.runtime';await mkdir(reportDirectory,{recursive:true});await writeFile(reportDirectory+'/load-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));if(errors.length||snapshot.total!==count||snapshot.paired!==count||liveConnections!==count||photoSuccess!==photoCount)process.exitCode=1;
+latencies.sort((a,b)=>a-b);const report={at:new Date().toISOString(),api,users:count,liveConnections,requests:latencies.length,errors,total:snapshot.total,paired:snapshot.paired,telemetry:{connected:waitingSnapshot.telemetry.connected,waiting:waitingSnapshot.telemetry.waiting,finished:finishedSnapshot.telemetry.finished},photoCount,photoSuccess,photoRetries,p50Ms:Math.round(latencies[Math.floor(latencies.length*.5)]),p95Ms:Math.round(latencies[Math.floor(latencies.length*.95)]),maxMs:Math.round(latencies.at(-1)!)};
+const reportDirectory=process.env.REPORT_DIRECTORY||'.runtime';await mkdir(reportDirectory,{recursive:true});await writeFile(reportDirectory+'/load-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));if(errors.length||snapshot.total!==count||snapshot.paired!==count||liveConnections!==count||photoSuccess!==photoCount||report.telemetry.connected!==count||report.telemetry.waiting!==count||report.telemetry.finished!==count)process.exitCode=1;
