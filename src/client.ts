@@ -3,7 +3,7 @@ import type { Answers, Participant, Session } from '../server/model';
 export const API=(import.meta.env.VITE_API_URL || '').replace(/\/$/,'');
 export class ApiError extends Error { constructor(public status:number,message:string){super(message);} }
 export async function request<T>(path:string,token='',body?:unknown,method=body?'POST':'GET'):Promise<T> {
-  const response=await fetch(API+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
+  const response=await fetch(API+path,{method,signal:AbortSignal.timeout(15000),headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
   if(!response.ok) {const data=await response.json().catch(()=>({}));throw new ApiError(response.status,data.error || 'Unable to connect. Please try again.');}return response.json();
 }
 export async function live(id:string,token:string,signal:AbortSignal,onChange:()=>void,onConnection:(online:boolean)=>void) {
@@ -53,7 +53,7 @@ export class Workshop {
           job.consentVersion ??= this.identity.participant.consentVersion;await this.persist();
           if(job.card!.photo && !job.assetId){
             const blob=await(await fetch(job.card!.photo)).blob(),form=new FormData();form.append('photo',blob,'build.jpg');
-            const res=await fetch(API+`/v1/sessions/${id}/photos?consentVersion=${job.consentVersion}`,{method:'POST',headers:{Authorization:'Bearer '+token},body:form});
+            const res=await fetch(API+`/v1/sessions/${id}/photos?consentVersion=${job.consentVersion}`,{method:'POST',signal:AbortSignal.timeout(45000),headers:{Authorization:'Bearer '+token},body:form});
             if(!res.ok){const e=await res.json();throw new ApiError(res.status,e.error);}
             job.assetId=(await res.json()).assetId;await this.persist();
           }
