@@ -1,0 +1,44 @@
+name: builders-with-taste
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: builders
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      POSTGRES_DB: builders
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U builders -d builders"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 1g
+  api:
+    build: .
+    image: builders-with-taste:${APP_VERSION:-local}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://builders:${DB_PASSWORD}@db:5432/builders
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS}
+    ports:
+      - "127.0.0.1:4181:4181"
+    volumes:
+      - ${PHOTO_DIRECTORY:-./.runtime/data}:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4181/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    mem_limit: 1g
+    cpus: 2
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+volumes:
+  database:

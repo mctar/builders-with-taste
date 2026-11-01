@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.env
+.runtime/
+coverage/
+*.log
+.DS_Store
+PLAN.md
