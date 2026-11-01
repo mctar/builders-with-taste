@@ -63,6 +63,12 @@ Backend releases are controlled separately. Copy reviewed source to Hugin, set a
 - Select retention with the facilitator. This release does not automatically delete participant data. Remove closed sessions and their associated assets/operation records only after an export and an agreed retention period. Exported JSON is untrusted participant content and must be escaped if imported into another UI.
 - Hugin and its network are single points of failure. Rehearse on the actual venue Wi-Fi with the projection computer. A 400-client burst test verifies the tested API path, not the venue's wireless capacity or a complete event-duration soak.
 
+## Big-screen scenes
+
+The facilitator selects overview, results, gallery, or reflections. Votes land as coloured bricks (one per answer); results show animated paths using only people with both before and after answers. The gallery rotates a build into the spotlight every 11 seconds and celebrates newly shared contributions. Pausing the gallery removes its images from the screen immediately.
+
+The join QR stays on screen. Click it or press **J** for a large reveal; **Escape** closes it. **M** toggles decorative motion, and the screen respects the operating system's reduced-motion setting. Use the full-screen button for projection. Rehearsal sessions are visibly marked **DRY RUN**.
+
 ## Checks
 
 `npm test` covers phase gating, session ownership, participant/stage permissions, idempotent joins/writes, stale revisions, actual image upload/access, publication/hiding, consent revocation and stale replay, paired aggregates, pause/resume timers, CORS, and withdrawal after session closure. The load test is separate so normal CI does not generate 400 sessions or contact production.
