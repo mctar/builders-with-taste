@@ -27,7 +27,7 @@ export class Workshop {
   constructor(public identity:Identity){}
   get key(){return `bwt:${this.identity.id}:${this.identity.participant.id}`;}
   async init(){const saved=await get<{draft:Draft;jobs:Job[]}>(this.key);if(saved){this.draft=saved.draft;this.jobs=saved.jobs;}else{this.draft.answers=this.identity.participant.data;this.draft.step=this.identity.participant.data.progress||0;}this.onChange();}
-  async persist(){const snapshot=structuredClone({draft:this.draft,jobs:this.jobs});this.persisting=this.persisting.then(()=>set(this.key,snapshot)).catch(()=>{this.message='Phone storage is full. Keep this page open and free some space.';this.onChange();throw new Error(this.message);});await this.persisting;}
+  async persist(){const snapshot=structuredClone({draft:this.draft,jobs:this.jobs});const save=()=>set(this.key,snapshot);this.persisting=this.persisting.then(save,save).catch(()=>{this.message='Phone storage is full. Keep this page open and free some space.';this.onChange();throw new Error(this.message);});await this.persisting;}
   edit(patch:Partial<Draft>){Object.assign(this.draft,patch);this.onChange();void this.persist().catch(()=>{});}
   async patch(patch:Answers){
     Object.assign(this.draft.answers,patch);

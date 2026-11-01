@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:api": "tsx watch server/main.ts",
-    "build": "tsc --noEmit && vite build && tsc -p tsconfig.server.json",
+    "build": "tsc --noEmit && vite build && tsc -p tsconfig.server.json && cp server/schema.sql build/server/schema.sql",
     "start": "node build/server/main.js",
     "test": "node --import tsx --test tests/*.test.ts",
     "session": "node --import tsx scripts/session.ts",
